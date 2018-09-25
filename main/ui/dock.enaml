@@ -1,0 +1,270 @@
+#------------------------------------------------------------------------------
+#  Copyright (c) 2013, Nucleic Development Team
+#
+# Distributed under the terms of the Modified BSD License.
+#
+# The full license is in the file COPYING.txt, distributed with this software.
+#------------------------------------------------------------------------------
+""" This example demonstrates the use of alerts on the DockItem widget.
+
+The DockItem widget and related bits in the DockArea support a style
+sheet pseudo-class named 'alert'. This pseudo-class is very powerful in
+that it allows the developer to provide their own arbitrary token to the
+pseudo-class as an argument, and then apply that token to a dock item at
+runtime. This gives the developer complete freedom over the how they style
+their alerts, and does not force them in to a pre-defined hierarchy of
+alert levels.
+
+<< autodoc-me >>
+"""
+from enaml.layout.api import (
+    HSplitLayout, VSplitLayout, TabLayout, hbox, vbox, spacer
+)
+from enaml.styling import StyleSheet
+from enaml.stdlib.dock_area_styles import (
+    VS2010Style, TitleBarStyle, DockBarButtonStyle, ContainerStyle,
+    ItemStyle, TabBarTabStyle, TitleBarLabelStyle
+)
+from enaml.widgets.api import (
+    MainWindow, Container, DockPane, DockArea, DockItem, Html, 
+    Field, PushButton, Notebook, Page, Menu, Action, MenuBar, StatusBar,
+    StatusItem, Label, MdiWindow, MdiArea
+)
+#from enaml.widgets import Stack, StackItem
+import qtawesome as qta
+from PyQt5.QtGui import QIcon
+from PyQt5.QtWidgets import (QAction, QMenu)
+from enaml.core.looper import Looper
+from enaml.icon import Icon, IconImage
+#from enamlx.core.looper import ListLooper
+from atom.api import (Atom, Unicode, Range, Int, Float, ContainerList, Bool)
+from .widgets.tableview import TableView
+
+enamldef MyAlertStyleSheet(StyleSheet):
+
+    # Include the base VS 2010 styling rules
+    VS2010Style():
+        pass
+
+    # Add alert styles for an "important" alert.
+    TitleBarStyle:
+        pseudo_class = 'alert(important)'
+        background = 'orange'
+
+    TitleBarLabelStyle:
+        pseudo_class = 'alert(important)'
+        color = 'black'
+
+    DockBarButtonStyle:
+        pseudo_class = 'alert(important)'
+        background = 'orange'
+
+    TabBarTabStyle:
+        pseudo_class = 'alert(important)'
+        background = 'orange'
+
+
+    # Add alert styles for an "information" alert.
+    TitleBarStyle:
+        pseudo_class = 'alert(information)'
+        background = 'olivedrab'
+
+    DockBarButtonStyle:
+        pseudo_class = 'alert(information)'
+        background = 'olivedrab'
+
+    TabBarTabStyle:
+        pseudo_class = 'alert(information)'
+        background = 'olivedrab'
+
+
+    # Add alert styles for a "meltdown" alert.
+    TitleBarStyle:
+        pseudo_class = 'alert(meltdown)'
+        background = 'red'
+
+    DockBarButtonStyle:
+        pseudo_class = 'alert(meltdown)'
+        background = 'red'
+
+    TabBarTabStyle:
+        pseudo_class = 'alert(meltdown)'
+        background = 'red'
+
+    ContainerStyle:
+        pseudo_class = 'alert(meltdown)'
+        background = 'yellow'
+
+    ItemStyle:
+        pseudo_class = 'alert(meltdown)'
+        background = 'red'
+
+import os
+def icon_path(name):
+    return os.path.join('main', 'ui', 'images', name+'.svg')
+
+enamldef MyMenuBar(MenuBar):
+    Menu:
+        title = '&File'
+        Menu:
+            title = 'New'
+            #icon = Icon(_tkdata=qta.icon('fa.file'))
+            Action:
+                text = 'Scan Window'
+                icon = Icon(_tkdata=qta.icon('fa.search'))
+                triggered :: print('New File triggered')
+        Action:
+                text = 'New Window'
+                icon = Icon(_tkdata=QIcon(icon_path('new')))
+                triggered :: print('New File triggered')
+        Action:
+            separator = True
+        Action:
+            icon = Icon(_tkdata=qta.icon('fa.sign-out'))
+            text = 'Exit\tCtrl+Z'
+            triggered :: print('exit')
+    Menu:
+        title = '&View'
+        Action:
+            checkable = True
+            icon = Icon(_tkdata=qta.icon('fa.info-circle'))
+            text = 'Information'
+            triggered :: print('info')
+    Menu:
+        title = '&Help'
+        Action:
+            icon = Icon(_tkdata=qta.icon('fa.info'))
+            text = 'About'
+            triggered :: print('info')
+
+enamldef MyStatusBar(StatusBar):
+    StatusItem:
+        Label:
+            text = "Ready"
+
+enamldef MdiScanner(MdiWindow):
+    attr model
+    title = 'Scanner %d' % num
+    Container:
+        constraints = [
+            vbox(
+                hbox(pb, cb, fld),
+                html,
+            ),
+            align('v_center', pb, cb, fld),
+        ]
+
+enamldef Main(MainWindow):
+    
+    title = 'Trader'
+    icon = Icon(_tkdata=QIcon(icon_path('chart')))  
+    attr model
+    attr data_sources #datasources
+    
+    MyMenuBar:
+        pass
+    MyStatusBar:
+        pass
+    MyAlertStyleSheet:
+        pass
+    DockPane: dp:
+        title = 'DataSource'
+        title_bar_orientation = 'vertical'
+        closable = False
+        dock_area = 'top'
+        Container:
+            Notebook: nb:
+                tab_style = 'preferences'
+                tabBarClicked::
+                    #print(change)
+                    cur_tab_i = change['value'].tabIndex
+                    cur_ds = data_sources[cur_tab_i]
+                    #action for connect
+                    action1 = None                    
+                    if cur_ds.status.isConnected:
+                        icon1 = qta.icon('fa.unlink', color='red')
+                        action1 = QAction(icon1, "&Disconnect",  None,
+                            statusTip = "Disconnect from " + cur_ds.status.fullname, 
+                            triggered = cur_ds.controller.disconnect)
+                    else:
+                        icon1 = qta.icon('fa.link', color='green')
+                        #print(icon1)
+                        action1 = QAction(icon=icon1, text="&Connect", parent=None,
+                            statusTip = "Connect to " + cur_ds.status.fullname, 
+                            triggered = cur_ds.controller.connect)
+                    #action for setting
+                    icon2 = qta.icon('fa.cogs', color='gray')
+                    action2 = QAction(icon2, "&Setting", None,
+                        statusTip = "Setting for " + cur_ds.status.fullname, 
+                        triggered = cur_ds.controller.setting)
+                    #menu
+                    menu = QMenu()   
+                    menu.addAction(action1)
+                    menu.addAction(action2)                    
+                    menu.exec(change['value'].globalPos)
+                Looper:
+                    iterable << data_sources
+                    Page:
+                        title = loop_item.status.showname
+                        closable = False
+                        tool_tip = loop_item.status.fullname
+                        icon << Icon(_tkdata=qta.icon('fa.circle', color='green', scale_factor=0.7)) \
+                                if loop_item.status.isConnected else \
+                                Icon(_tkdata=qta.icon('fa.circle', color='orange', scale_factor=0.7))
+
+    Container:
+        padding = 0
+        
+        DockArea:
+            # A custom style sheet is being used, so the default style
+            # sheet must be disabled - IMPORTANT!
+            style = ''
+            layout = HSplitLayout(
+                VSplitLayout('controls', 'information'),
+                VSplitLayout('important', 'meltdown'),
+                #TabLayout('dummy_1', 'dummy_2', 'dummy_3', 'dummy_4'),
+            )
+            DockItem:
+                title = 'Controls'
+                name = 'controls'
+                stretch = 0
+                Container:
+                    #PushButton:
+                    #    text = 'Information'
+                    #    clicked ::
+                    #        info_item.alert('information')
+                    #PushButton:
+                    #    text = 'Important'
+                    #    clicked ::
+                    #        important_item.alert('important', persist=True)
+                    PushButton:
+                        text = 'Meltdown'
+                        clicked ::
+                            meltdown_item.alert(
+                                'meltdown', on=200, off=100, repeat=10
+                            )
+            DockItem: meltdown_item:
+                title = 'Information'
+                name = 'information'
+                closable = False
+                stretch = 0
+                Container:
+                    PushButton: pb1:
+                        text = 'Start Scanning'
+                        clicked :: 
+                            import re
+                            with open("d:/ib/t2/data/stocks.txt", 'r', encoding='UTF-8') as f:
+                                b = ['HK.{0}'.format(re.split(r'\t+', x.strip(' \t\n\r'))[0]) for x in f if len(x.strip())>0]
+                                del b[0]
+                                del b[10:]
+                            print(b)
+                            data_sources[0].controller.scan(model, b, ['1m'])
+                            #model.insert(['2018-11-02','09:17:00',30014,30037,30012,30030,756])                   
+                    PushButton: pb2:
+                        text = 'Stop Scanning'
+                        clicked :: 
+                            data_sources[0].controller.stop_scan()
+                    TableView: tbl:
+                        tableModel = model
+                        sortingEnabled = True
+                        

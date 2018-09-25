@@ -1,0 +1,145 @@
+from enaml.widgets.api import Window, Field, Container, ObjectCombo, Label, PushButton
+from enaml.layout.api import vbox, hbox, spacer, align
+from enaml.icon import Icon, IconImage
+from enaml.image import Image
+import qtawesome as qta
+from enaml.styling import (
+    StyleSheet, Style, Setter
+)
+import os
+
+from .widgets.symbol_search import SymbolSearch
+#from .widgets.symbol_search import TableView
+from .widgets.mybutton import MyButton
+from .widgets.tableview import TableView
+from .widgets.data_frame_table import DataFrameTable
+
+from .widgets.list import QtListStrWidget
+import qtawesome as qta
+from PyQt5.QtSvg import QSvgRenderer
+from PyQt5.QtGui import QIcon, QImage
+from PyQt5.QtCore import QByteArray, QBuffer
+
+
+def image(name):    
+    dirname = os.path.dirname(__file__)
+    #return os.path.join(dirname, 'images', name)
+    path = os.path.join(dirname, 'images', name)
+    b = open(path, 'rb').read()
+    #print(b)
+    return b
+
+def image_path(name):
+    dirname = os.path.dirname(__file__)
+    return os.path.join(dirname, 'images', name)
+
+enamldef AppSheet(StyleSheet):
+    Style:
+        element = 'Field, ObjectCombo, Label, SymbolSearch'
+        Setter:
+            field = 'font-size'
+            value = '20px'
+        Setter:
+            field = 'padding'
+            value = '2px'
+        Setter:
+            field = 'border-style'
+            value = 'solid'
+        Setter:
+            field = 'border-width'
+            value = '2px'
+        Setter:
+            field = 'border-color'
+            value = 'transparent'
+    Style:
+        element = 'Field, ObjectCombo'
+        Setter:
+            field = 'border-radius'
+            value = '5px'
+        Setter:
+            field = 'background-color'
+            value = 'lineargradient(red, yellow)'
+    Style:      
+        element = 'Field, ObjectCombo'
+        pseudo_class = 'focus'
+        Setter:
+            field = 'border-color'
+            value = '#4286f4'
+    Style:
+        element = 'ObjectCombo'
+        pseudo_element = 'down-button'
+        Setter:
+            field = 'color'
+            value = 'red'
+        
+    Style:      
+        element = 'ObjectCombo'
+        pseudo_element = 'down-button'
+        Setter:
+            field = 'background'
+            value = 'lightblue'
+        
+enamldef Main(Window):
+    attr ssdata
+    attr model
+    attr dfModel
+    title = 'IB Trader'
+    
+    #icon = Icon(images = [IconImage(image=Image(data=open(image_path('stock.ico'), 'rb').read()))])
+    #icon = Icon(images=[IconImage(image=Image(data=image('stock.ico')))])
+    #icon = Icon(images = [IconImage(image=Image(data=icon('fa.flag')))])
+    icon = Icon(_tkdata=qta.icon('fa.flag'))
+    #icon = Icon(_tkdata=QSvgRenderer(image_path('connect.svg')))
+    Container:
+
+        constraints = [
+            vbox(
+                hbox(ss, mb, spacer),
+                hbox(lst, spacer),
+                hbox(label, combo_align, spacer),
+                hbox(field, spacer),
+                hbox(pb1, spacer),
+                hbox(tb),
+                #hbox(dft)
+            ),
+            align('v_center', label, combo_align),
+            field.width == 300,
+        ]
+
+        TableView: tb:
+            tableModel = model
+
+        DataFrameTable: dft:
+            data_frame = dfModel
+
+        MyButton: mb:
+            text = ssdata.text
+
+        QtListStrWidget: lst:
+            pass
+
+        SymbolSearch: ss:
+            data := ssdata.data
+            enterPressed :: 
+                v = change['value']
+                #print(v)
+                #ssdata.search(v)
+                #action.search(v)
+            setting := ssdata.setting
+            placeholder := ssdata.text
+        
+        Label: label:
+            text = 'text_align:'
+
+        ObjectCombo: combo_align:
+            items = ['Buy', 'Sell']
+            selected = 'Buy'
+
+        Field: field:
+            placeholder = 'Enter code...'
+            text << str(ssdata.test)
+        
+        PushButton: pb1:
+            text = 'Push Me'
+            clicked :: ssdata.click()
+            

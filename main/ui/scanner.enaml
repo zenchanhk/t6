@@ -1,0 +1,100 @@
+from enaml.layout.api import (
+    HSplitLayout, VSplitLayout, TabLayout, hbox, vbox, spacer
+)
+from enaml.styling import StyleSheet
+from enaml.stdlib.dock_area_styles import (
+    VS2010Style, TitleBarStyle, DockBarButtonStyle, ContainerStyle,
+    ItemStyle, TabBarTabStyle, TitleBarLabelStyle
+)
+from enaml.widgets.api import (
+    MainWindow, Container, DockPane, DockArea, DockItem, Html, 
+    Field, PushButton, Notebook, Page, Menu, Action, MenuBar, StatusBar,
+    StatusItem, Label, MdiWindow, MdiArea
+)
+#from enaml.widgets import Stack, StackItem
+import qtawesome as qta
+from PyQt5.QtGui import QIcon
+from PyQt5.QtWidgets import (QAction, QMenu)
+from enaml.core.looper import Looper
+from enaml.icon import Icon, IconImage
+#from enamlx.core.looper import ListLooper
+from atom.api import (Atom, Unicode, Range, Int, Float, ContainerList, Bool)
+from .widgets.tableview import TableView
+
+enamldef MyAlertStyleSheet(StyleSheet):
+
+    # Include the base VS 2010 styling rules
+    VS2010Style():
+        pass
+
+    # Add alert styles for an "important" alert.
+    TitleBarStyle:
+        pseudo_class = 'alert(important)'
+        background = 'orange'
+
+    TitleBarLabelStyle:
+        pseudo_class = 'alert(important)'
+        color = 'black'
+
+    DockBarButtonStyle:
+        pseudo_class = 'alert(important)'
+        background = 'orange'
+
+    TabBarTabStyle:
+        pseudo_class = 'alert(important)'
+        background = 'orange'
+
+
+    # Add alert styles for an "information" alert.
+    TitleBarStyle:
+        pseudo_class = 'alert(information)'
+        background = 'olivedrab'
+
+    DockBarButtonStyle:
+        pseudo_class = 'alert(information)'
+        background = 'olivedrab'
+
+    TabBarTabStyle:
+        pseudo_class = 'alert(information)'
+        background = 'olivedrab'
+
+
+    # Add alert styles for a "meltdown" alert.
+    TitleBarStyle:
+        pseudo_class = 'alert(meltdown)'
+        background = 'red'
+
+    DockBarButtonStyle:
+        pseudo_class = 'alert(meltdown)'
+        background = 'red'
+
+    TabBarTabStyle:
+        pseudo_class = 'alert(meltdown)'
+        background = 'red'
+
+    ContainerStyle:
+        pseudo_class = 'alert(meltdown)'
+        background = 'yellow'
+
+    ItemStyle:
+        pseudo_class = 'alert(meltdown)'
+        background = 'red'
+
+import os
+def icon_path(name):
+    return os.path.join('main', 'ui', 'images', name+'.svg')
+
+enamldef MdiScanner(MdiWindow):
+    attr model
+    title = 'Scanner %d' % num
+    Container:
+        constraints = [
+            vbox(
+                hbox(pb, cb, fld),
+                html,
+            ),
+            align('v_center', pb, cb, fld),
+        ]
+
+        
+        
