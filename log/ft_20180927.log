@@ -1,0 +1,46 @@
+2018-09-27 09:06:37,770 [open_context_base.py] _socket_reconnect_and_wait_ready:205: Start connecting: host=127.0.0.1; port=11111;
+2018-09-27 09:06:37,771 [open_context_base.py] _socket_reconnect_and_wait_ready:208: try connecting: host=127.0.0.1; port=11111;
+2018-09-27 09:06:37,836 [open_context_base.py] _handle_init_connect:365: sync socket init_connect ok: {'server_version': 103, 'login_user_id': 2050878, 'conn_id': 2978102007245144087, 'conn_key': '1080B936FF5854BE', 'keep_alive_interval': 10}
+2018-09-27 09:32:47,013 [open_context_base.py] on_error:302: Connect error: conn_id=1; err=[WinError 10053] An established connection was aborted by the software in your host machine;
+2018-09-27 09:32:47,020 [open_context_base.py] _wait_reconnect:378: Wait reconnect in 8 seconds: host=127.0.0.1; port=11111;
+2018-09-27 09:32:55,064 [open_context_base.py] _socket_reconnect_and_wait_ready:205: Start connecting: host=127.0.0.1; port=11111;
+2018-09-27 09:32:55,067 [open_context_base.py] _socket_reconnect_and_wait_ready:208: try connecting: host=127.0.0.1; port=11111;
+2018-09-27 09:32:55,130 [open_context_base.py] _handle_init_connect:365: sync socket init_connect ok: {'server_version': 103, 'login_user_id': 2050878, 'conn_id': 16236700434972547940, 'conn_key': '681BF816055A54D6', 'keep_alive_interval': 10}
+2018-09-27 11:05:48,807 [open_context_base.py] on_error:302: Connect error: conn_id=2; err=[WinError 10053] An established connection was aborted by the software in your host machine;
+2018-09-27 11:05:48,814 [open_context_base.py] _wait_reconnect:378: Wait reconnect in 8 seconds: host=127.0.0.1; port=11111;
+2018-09-27 11:05:56,836 [open_context_base.py] _socket_reconnect_and_wait_ready:205: Start connecting: host=127.0.0.1; port=11111;
+2018-09-27 11:05:56,838 [open_context_base.py] _socket_reconnect_and_wait_ready:208: try connecting: host=127.0.0.1; port=11111;
+2018-09-27 11:05:56,886 [open_context_base.py] _handle_init_connect:365: sync socket init_connect ok: {'server_version': 103, 'login_user_id': 2050878, 'conn_id': 17389626426933977399, 'conn_key': '312125E2195E54E9', 'keep_alive_interval': 10}
+2018-09-27 11:36:05,948 [open_context_base.py] on_error:302: Connect error: conn_id=3; err=[WinError 10053] An established connection was aborted by the software in your host machine;
+2018-09-27 11:36:05,955 [open_context_base.py] _wait_reconnect:378: Wait reconnect in 8 seconds: host=127.0.0.1; port=11111;
+2018-09-27 11:36:13,980 [open_context_base.py] _socket_reconnect_and_wait_ready:205: Start connecting: host=127.0.0.1; port=11111;
+2018-09-27 11:36:13,984 [open_context_base.py] _socket_reconnect_and_wait_ready:208: try connecting: host=127.0.0.1; port=11111;
+2018-09-27 11:36:14,015 [open_context_base.py] _handle_init_connect:365: sync socket init_connect ok: {'server_version': 103, 'login_user_id': 2050878, 'conn_id': 12922057824679978290, 'conn_key': '36651BA7206054DB', 'keep_alive_interval': 10}
+2018-09-27 11:36:58,224 [open_context_base.py] on_error:302: Connect error: conn_id=4; err=[WinError 10053] An established connection was aborted by the software in your host machine;
+2018-09-27 11:36:58,243 [open_context_base.py] _wait_reconnect:378: Wait reconnect in 8 seconds: host=127.0.0.1; port=11111;
+2018-09-27 11:37:06,450 [open_context_base.py] _socket_reconnect_and_wait_ready:205: Start connecting: host=127.0.0.1; port=11111;
+2018-09-27 11:37:06,451 [open_context_base.py] _socket_reconnect_and_wait_ready:208: try connecting: host=127.0.0.1; port=11111;
+2018-09-27 11:37:06,491 [open_context_base.py] _handle_init_connect:365: sync socket init_connect ok: {'server_version': 103, 'login_user_id': 2050878, 'conn_id': 9751525886873872084, 'conn_key': 'D3A624D92062543E', 'keep_alive_interval': 10}
+2018-09-27 18:20:20,792 [open_context_base.py] _socket_reconnect_and_wait_ready:205: Start connecting: host=127.0.0.1; port=11111;
+2018-09-27 18:20:20,806 [open_context_base.py] _socket_reconnect_and_wait_ready:208: try connecting: host=127.0.0.1; port=11111;
+2018-09-27 18:20:25,809 [open_context_base.py] on_connect_timeout:318: Connect timeout: conn_id=1
+2018-09-27 18:20:25,825 [open_context_base.py] _wait_reconnect:378: Wait reconnect in 8 seconds: host=127.0.0.1; port=11111;
+2018-09-27 18:20:33,833 [open_context_base.py] _socket_reconnect_and_wait_ready:205: Start connecting: host=127.0.0.1; port=11111;
+2018-09-27 18:20:33,840 [open_context_base.py] _socket_reconnect_and_wait_ready:208: try connecting: host=127.0.0.1; port=11111;
+2018-09-27 18:20:38,856 [open_context_base.py] on_connect_timeout:318: Connect timeout: conn_id=2
+2018-09-27 18:20:38,864 [open_context_base.py] _wait_reconnect:378: Wait reconnect in 8 seconds: host=127.0.0.1; port=11111;
+2018-09-27 18:20:46,880 [open_context_base.py] _socket_reconnect_and_wait_ready:205: Start connecting: host=127.0.0.1; port=11111;
+2018-09-27 18:20:46,893 [open_context_base.py] _socket_reconnect_and_wait_ready:208: try connecting: host=127.0.0.1; port=11111;
+2018-09-27 18:20:51,907 [open_context_base.py] on_connect_timeout:318: Connect timeout: conn_id=3
+2018-09-27 18:20:51,921 [open_context_base.py] _wait_reconnect:378: Wait reconnect in 8 seconds: host=127.0.0.1; port=11111;
+2018-09-27 18:20:59,928 [open_context_base.py] _socket_reconnect_and_wait_ready:205: Start connecting: host=127.0.0.1; port=11111;
+2018-09-27 18:20:59,932 [open_context_base.py] _socket_reconnect_and_wait_ready:208: try connecting: host=127.0.0.1; port=11111;
+2018-09-27 18:21:04,953 [open_context_base.py] on_connect_timeout:318: Connect timeout: conn_id=4
+2018-09-27 18:21:04,959 [open_context_base.py] _wait_reconnect:378: Wait reconnect in 8 seconds: host=127.0.0.1; port=11111;
+2018-09-27 18:21:12,968 [open_context_base.py] _socket_reconnect_and_wait_ready:205: Start connecting: host=127.0.0.1; port=11111;
+2018-09-27 18:21:12,986 [open_context_base.py] _socket_reconnect_and_wait_ready:208: try connecting: host=127.0.0.1; port=11111;
+2018-09-27 18:21:18,003 [open_context_base.py] on_connect_timeout:318: Connect timeout: conn_id=5
+2018-09-27 18:21:18,016 [open_context_base.py] _wait_reconnect:378: Wait reconnect in 8 seconds: host=127.0.0.1; port=11111;
+2018-09-27 18:21:26,030 [open_context_base.py] _socket_reconnect_and_wait_ready:205: Start connecting: host=127.0.0.1; port=11111;
+2018-09-27 18:21:26,035 [open_context_base.py] _socket_reconnect_and_wait_ready:208: try connecting: host=127.0.0.1; port=11111;
+2018-09-27 18:21:26,071 [open_context_base.py] _handle_init_connect:365: sync socket init_connect ok: {'server_version': 103, 'login_user_id': 2050878, 'conn_id': 2989237294112125511, 'conn_key': '4032E7387BE87BBE', 'keep_alive_interval': 10}

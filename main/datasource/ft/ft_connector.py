@@ -28,11 +28,9 @@ ERROR = ERROR()
 
 
 class FTConnector(OpenQuoteContext):
-    _id = None              # to identify self
     _name = 'FuTu'          # show on tabbar
     _vid = 'FT'             # identify vendor
     _vendor = 'FuTu Co.'    # vendor
-    _isConnected = False
 
     def __init__(self, id, host, port):
         kwargs = {'host': host, 'port': port}

@@ -7,6 +7,7 @@ from ...utils.event import Event
 from collections import namedtuple
 from datetime import datetime, timedelta
 import pandas as pd
+import numpy as np
 import pydevd
 
 subTypeMap = {
@@ -136,7 +137,9 @@ class FTController:
             # calculate the time passed since last call
             # print('{0} last req_time: {1}'.format(self._id, self._req_time['request_history_kline'].strftime('%H:%M:%S')))
             time_passed = (datetime.now() - self._req_time['request_history_kline']).total_seconds()
-            await asyncio.sleep(interval - time_passed + 5)
+            print('{0} time passed. Now: {1}'.format(time_passed, datetime.now().strftime('%H:%M:%S')))
+            if time_passed > 0:
+                await asyncio.sleep(interval - time_passed + 5)
             self._req_time['request_history_kline'] = datetime.now()
             print('{0} retrieving: {1}'.format(self._id, datetime.now().strftime('%H:%M:%S')))
             for j in range(no_of_stocks):
@@ -171,6 +174,9 @@ class FTController:
                 _sub_type = subTypeMap[sub_type]
 
             # subscribe real-time kline
+            # t = threading.Thread(target=self._connector.subscribe, kwargs={'code_list': code_list,'subtype_list': [_sub_type]})
+            # t.start() 
+            
             ret, msg = self._connector.subscribe(code_list=code_list, subtype_list=[_sub_type])
 
             # store code_list for unsubscribing
@@ -334,21 +340,22 @@ class CurKlineHandler(CurKlineHandlerBase):
                 # if both break
                 if bc_rt and bv_rt:
                     code = t1['code']
-                    result = {'code': code, 'time': t1['time_key'], 'fulfilled': [0],
-                              'close': t1['close'], 'volume': t1['volume'], 
-                              'time_key': datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+                    result = {'code': code, 'time': t1['time_key'], 'fulfilled': [],
+                              'close': numpyGenericToNative(t1['close']), 
+                              'volume': numpyGenericToNative(t1['volume']), 
+                              'time_found': datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 
                     # if break yesterday's highest
                     if code in _max_c_last and code in _max_v_last and \
                             t1['close'] > _max_c_last[code] and t1['volume'] > _max_v_last[code]:
-                        result['fulfilled'].append(1)
+                        result['fulfilled'].append('break last day highest')
                     # if break today's highest
                     if code in _max_c and code in _max_v and \
                             t1['close'] > _max_c[code] and t1['volume'] > _max_v[code]:
-                        result['fulfilled'].append(2)
+                        result['fulfilled'].append('break today highest')
 
                     print(result)
-                    self._dataEvent.notify_all('{"action":"scan", "ret_val":' + json.dumps(result) + '"}')
+                    self._dataEvent.notify_all({"action":"scan", "ret_val": json.dumps(result)})
 
             return RET_OK, data
  
@@ -369,5 +376,11 @@ def update_df(df):
     # debug printing
     # print(df.iloc[-1].values.tolist())
 
+
+def numpyGenericToNative(obj):
+    if isinstance(obj, np.generic):
+        return np.asscalar(obj)
+    else:
+        return obj
 
 
