@@ -49,7 +49,7 @@ class FTConnector(OpenQuoteContext):
         print('closing')
         self.close()
         self._isConnected = False 
-        self.connectEvent.notify_all(self._con_status.CONNECTED)
+        self.connectEvent.notify_all(self._con_status.DISCONNECTED)
 
     def is_connected(self):
         return self._isConnected

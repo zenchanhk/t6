@@ -4,8 +4,9 @@
 # "DataCenter.Server". The following line sets the endpoints for this
 # adapter.
 #
-DataCenterAdapter.Endpoints=default -h localhost -p 10012
-
+DataCenterAdapter.Endpoints=default -h localhost -p 10011
+OrderPlaceAdapter.Endpoints=default -h localhost -p 10012
+LimitedReqAdapter.Endpoints=default -h localhost -p 10013
 #
 # Warn about connection exceptions
 #

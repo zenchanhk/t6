@@ -14,27 +14,33 @@ import Ice
 Ice.loadSlice(os.path.join(dir_path, 'traderex.ice'))
 import TraderEx
 import pydevd
-
-_ds = {}
+from concurrent.futures import ProcessPoolExecutor
 
 
 class Messenger(TraderEx.Server):
 
-    _receiver = None
+    def __init__(self, server_name):
+        self._serv_name = server_name
+        self._receiver = {}
+        self._ds = {}
+        self._clientid = 0
 
-    def register(self, clientId, receiver, current):
-        print('register')
-        print(threading.currentThread().getName())
-        self._receiver = receiver
-        self._receiver.onData('register successfully')
-    
+    def register(self, receiver, current):        
+        print('Regsiter - PID:{0}, Thread:{1}'.format(os.getpid(), threading.currentThread().getName()))
+        self._clientid += 1
+        self._receiver[self._clientid] = {'receiver': receiver}
+        return {'id': self._clientid}
+
+    def set_strategy(self, client_id, strategy, code_list):
+        self._receiver[self._clientid].update({'strategy': {strategy: code_list}})
+
     def execute(self, command, current):
         # print("receiver:")
         # print(_receiver)
+        print('PID:{0}, Thread:{1}'.format(os.getpid(), threading.currentThread().getName()))
         print('execute: ' + command)
-        print(threading.currentThread().getName())   
         ret = Executor.execute(command)
-        # print("ret")
+        print(ret)
         return ret
 
     def on_data(self, data):
@@ -49,6 +55,13 @@ class Messenger(TraderEx.Server):
         if self._receiver:
             self._receiver.onStatus(error)
 
+    def add_data_source(self, id, ds):
+        if id not in self._ds:
+            self._ds[id] = ds
+            return True
+        else:
+            return False
+
 
 class Executor:
     @staticmethod    
@@ -61,7 +74,7 @@ class Executor:
                 return Executor.convertRetValue(result)
             except Exception as e:
                 msg = {"exception": e.args[0]}
-                return msg
+                return Executor.convertRetValue(msg)
                 
         try:
             return exe(command)            
@@ -71,14 +84,6 @@ class Executor:
             print(e)
 
         print("Done.")
-
-    @staticmethod
-    def add_data_source(id, ds):
-        if id not in _ds:
-            _ds[id] = ds
-            return True
-        else:
-            return False
  
     @staticmethod
     def convertRetValue(result, is_serialized=True):
@@ -94,7 +99,7 @@ class Executor:
                 if isinstance(ret_val, pd.DataFrame):
                     ret_val = ret_val.to_dict(orient='list')
             else:
-                ret_val = result    # ret_val will be error description
+                pass    # ret_val will be error description
         else:
             ret_val = result
 
@@ -111,6 +116,8 @@ class Executor:
         if is_serialized:
             if isinstance(msg, concurrent.futures.Future):
                 return msg
+            elif isinstance(msg, str):
+                return msg
             else:
                 return json.dumps(msg)
         else:
@@ -122,11 +129,8 @@ class Executor:
 # The Ice communicator is initialized with Ice.initialize
 # The communicator is destroyed once it goes out of scope of the with statement
 #
-MESSENGER = Messenger()
-
-
-def init():
-    print(threading.currentThread().getName())
+def create_endpoint(name):
+    print('PID:{0}, Thread:{1}'.format(os.getpid(), threading.currentThread().getName()))
     with Ice.initialize(os.path.join(dir_path, "config.server")) as communicator:
 
         #
@@ -141,7 +145,13 @@ def init():
             print(sys.argv[0] + ": too many arguments")
             sys.exit(1)
 
-        adapter = communicator.createObjectAdapter("DataCenterAdapter")
-        adapter.add(MESSENGER, Ice.stringToIdentity("DataCenter"))
+        adapter = communicator.createObjectAdapter(name + "Adapter")
+        adapter.add(Messenger(), Ice.stringToIdentity(name))
         adapter.activate()
         communicator.waitForShutdown()
+
+def init():
+    with concurrent.futures.ProcessPoolExecutor(max_workers=5) as executor:
+        executor.submit(create_endpoint, 'DataCenter')
+        executor.submit(create_endpoint, 'OrderPlace')
+        executor.submit(create_endpoint, 'LimitedReq')
