@@ -13,6 +13,7 @@ import numpy as np
 import pydevd
 from concurrent.futures import ProcessPoolExecutor
 import concurrent
+import talib
 
 subTypeMap = {
     'ticker': SubType.TICKER,
@@ -67,16 +68,48 @@ _sdf = {}         # pd dataframe for stocks, key is stock code
 _indicator = {"max_c4": float("nan"), "max_v4": float("nan"),
               "max_c5": float("nan"), "max_v5": float("nan")}     # indicators
 
-# function for new loop
-my_loop = asyncio.new_event_loop()
-def foo(loop):
-    asyncio.set_event_loop(loop)
-    loop.run_forever()
+
+class Fifo:
+    _latency = 5    # tolerance for network delay
+
+    def __init__(self, period, quote):
+        self._period = period
+        self._list = []
+        self._quote = quote
+
+    def append(self, item):
+        self._list.append(item)
+    
+    def get_quote(self):
+        if len(self._list) == 0:
+            return 0, self._quote
+        # remove items that exceeds the period
+        i = 0
+        for item in self._list:
+            if (datetime.now() - item.time).total_seconds() <= self._period:
+                break
+            i += 1
+        del self._list[0: i]
+        # get the remaining quote
+        remaining = 0
+        if len(self._list) == 0:
+            return 0, self._quote
+        else:
+            for item in self._list:
+                remaining += item.count
+            if remaining < self._quote:
+                return 0, self._quote - remaining
+            else:
+                return (datetime.now() - self._list[0].time).total_seconds(), self._list[0].count
+            
 
 class FTController:
     
-    def __init__(self, id, messenger, host='127.0.0.1', port=11111):
+    def __init__(self, id, messenger, req_lmt, order_lmt, host='127.0.0.1', port=11111):
         
+        self._req_his = Fifo(req_lmt.period, req_lmt.quote)
+        self._order_his = Fifo(order_lmt.period, order_lmt.quote)
+
         self._connector = None
         self._messenger = messenger
         self._hktrade = None
@@ -91,9 +124,6 @@ class FTController:
         self._id = id
         self._host = host
         self._port = port
-        # record the time of request called
-        self._req_time = {'request_history_kline': datetime.now() - timedelta(days=1)}
-        # print("{0} init req time {1}".format(id, self._req_time['request_history_kline']))
         
         self.loop = asyncio.new_event_loop()
         def f(loop):
@@ -102,7 +132,6 @@ class FTController:
             loop.run_forever()
         t = threading.Thread(target=f, args=(self.loop,))
         t.start() 
-        #multiprocessing.Process(target=foo, args=(my_loop,)).start()
         
     def connect(self):  
         # future = asyncio.run_coroutine_threadsafe(self._connect(), self.loop)
@@ -228,13 +257,6 @@ class FTController:
 
     @asyncio.coroutine
     async def request_history_data_real(self, code_list, kl_type, limit, **kwargs):
-        # limitation of vendor, 10 stocks per 30 seconds interval
-        if isinstance(limit, str):
-            limit = json.loads(limit)
-
-        no_of_stocks = limit['no_of_stocks']
-        interval = limit['interval']
-
         result = []
         error = {}
 
@@ -279,7 +301,7 @@ class FTController:
             period: 
             limit: limitation of vendor
         '''
-        print('scan-sync PID:{0}, Thread:{1}'.format(os.getpid(), threading.currentThread().getName()))
+        print('coro-get-highest -- PID:{0}, Thread:{1}'.format(os.getpid(), threading.currentThread().getName()))
         if self._connector is None:
             self.connect()
         
@@ -377,6 +399,11 @@ class FTController:
         ret, err = self._connector.unsubscribe(code_list=code_list, subtype_list=subtype_list)
         return ret, err
 
+def set_strategy(code_list, strategy):
+    
+
+def apply_strategy(p_input):
+    pass
 
 class TradeOrderHandler(TradeOrderHandlerBase):
   """ order update push"""

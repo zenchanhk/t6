@@ -12,6 +12,7 @@ import pandas as pd
 from .utils.Messenger import MESSENGER, init
 from .datasource.ft.ft_controller import FTController
 import re
+import PyQt5
 
 
 def main():

@@ -43,24 +43,23 @@ class Messenger(TraderEx.Server):
         print(ret)
         return ret
 
-    def on_data(self, data):
-        if self._receiver:
-            self._receiver.onData(data)
+    def on_data(self, receiver, data):
+        if receiver in self._receiver:
+            self._receiver[receiver].onData(data)
 
-    def on_error(self, error):
-        if self._receiver:
-            self._receiver.onError(error)
+    def on_error(self, receiver, error):
+        if receiver in self._receiver:
+            self._receiver[receiver].onError(error)
 
-    def on_status(self, error):
-        if self._receiver:
-            self._receiver.onStatus(error)
+    def on_status(self, receiver, status):
+        if receiver in self._receiver:
+            self._receiver[receiver].onStatus(status)
 
-    def add_data_source(self, id, ds):
-        if id not in self._ds:
-            self._ds[id] = ds
-            return True
-        else:
-            return False
+    def add_data_source(self, controller, host, port):
+        ctrl = controller.__name__ + host + port
+        if ctrl not in self._ds:
+            self._ds[ctrl] = controller(host=host, port=port)
+        return ctrl
 
 
 class Executor:
@@ -146,12 +145,12 @@ def create_endpoint(name):
             sys.exit(1)
 
         adapter = communicator.createObjectAdapter(name + "Adapter")
-        adapter.add(Messenger(), Ice.stringToIdentity(name))
+        adapter.add(Messenger(name), Ice.stringToIdentity(name))
         adapter.activate()
         communicator.waitForShutdown()
 
 def init():
-    with concurrent.futures.ProcessPoolExecutor(max_workers=5) as executor:
+    with ProcessPoolExecutor(max_workers=5) as executor:
         executor.submit(create_endpoint, 'DataCenter')
         executor.submit(create_endpoint, 'OrderPlace')
         executor.submit(create_endpoint, 'LimitedReq')
