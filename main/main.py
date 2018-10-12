@@ -1,44 +1,218 @@
-import sys
-import os
-#from .models.IBConnector import IBConnector
-#from .models.Symbol import Symbol
-#from .models.PlaceOrder import PlaceOrder
-from configobj import ConfigObj
-from collections import namedtuple
-from .utils.tools import copyall
-import json
-import numpy as np
-import pandas as pd
-from .utils.Messenger import MESSENGER, init
-from .datasource.ft.ft_controller import FTController
-import re
-import PyQt5
+from atom.api import Atom, Unicode, Range, Bool, Value, Int, Tuple, observe, ContainerList
+import enaml
+from enaml.qt.qt_application import QtApplication
+
+import os 
+dir_path = os.path.dirname(os.path.realpath(__file__))
+import Ice
+
+from concurrent.futures import ProcessPoolExecutor
+from multiprocessing import Manager, Queue, Pipe
+import threading
+
+# show icon on windows task bar
+import ctypes
+myappid = 'stock.backend' # arbitrary string
+ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
+
+# include enamlx
+import enamlx
+enamlx.install()
+
+from .utils.Messenger import Messenger
+import pickle
+import enum
+
+class Position(enum.IntEnum):
+    TOP = 0
+    BOTTOM = 1
+
+class Status(enum.IntEnum):
+    CONNECTED = 0
+    DISCONNECTED = 1
+    RETRYING = 2
+    ERROR = 3
+
+class MessageReceiver(threading.Thread):
+    
+    def __init__(self, queue, parent=None):
+        """
+        :param queue: receive messages from processes
+
+        """
+        threading.Thread.__init__(self)
+        self._queue = queue
+
+    def run(self):
+        while True:
+            print('receiving...')
+            msg = self._queue.get()
+            eval(msg)
 
 
+class ListModel(Atom):
+    lst = ContainerList()
+    def add(self, item, position=Position.TOP):
+        if position == Position.TOP:
+            self.lst.insert(0, item)      
+        elif position == Position.BOTTOM:
+            self.lst.add(item)
+
+    def remove(self, item):
+        self.lst.remove(item)
+
+    def clear(self):
+        self.lst = ContainerList()
+
+class EndPoint(Atom):
+    name = Unicode()
+    status = ListModel()
+
+class Datasource(Atom):
+    name = Unicode()
+    status = Int(1)
+    message = ListModel()
+
+class Action:
+    def __init__(self, pipes):
+        self._pipes = pipes
+    
+    def send_action(self, statement):
+        for p in self._pipes:
+            p.send(statement)
+
+# =========================================================
+# create multiple processes to handle subscribtion, order_place, and request_historical_data, respectively
+#
+def init(c2p_queue, endpoints):    
+    with ProcessPoolExecutor(max_workers=5) as executor:
+        with Manager() as manager:
+            shared_dict = manager.dict()    # store datasource and limiations           
+            data_queue = Queue()            # for transfer data, only data handler process receives data
+            for ep in endpoints:            
+                executor.submit(create_endpoint, ep['pipe'], c2p_queue, data_queue, shared_dict)
+
+# =========================================================
+#
+# The Ice communicator is initialized with Ice.initialize
+# The communicator is destroyed once it goes out of scope of the with statement
+#
+def create_endpoint(name, pipe, c2p_queue, data_queue, shared_dict):    
+    '''
+        name: endpoint's name        
+        pipe: actions sending from UI
+        c2p_queue: status or errors sending from datasource, child to parent
+        data_queue: transfer data to data_handling process
+        shared_dict: dict sharing among the processes
+    '''
+    with Ice.initialize(os.path.join(dir_path, "config.server")) as communicator:        
+        # initialization
+        adapter = communicator.createObjectAdapter(name + "Adapter")
+        adapter.add(Messenger(name, c2p_queue, pipe, shared_dict), Ice.stringToIdentity(name))
+        adapter.activate()
+        communicator.waitForShutdown()
+
+# ========================================================
+# main function
+#
 def main():
-    init()
+    # child to parent queue for transfering status and message
+    c2p_queue = Queue()
+    # create thread to receive message from processes
+    msg_rcver = MessageReceiver(c2p_queue)
+    msg_rcver.daemon = True
+    msg_rcver.start()
+    # create ICE end points for UI
+    endpoints = [{'name':'DataCenter', 'pipe': []},    # request real-time data
+                 {'name':'OrderPlace', 'pipe': []},    # for scheduled orders
+                 {'name':'LimitedReq', 'pipe': []}]    # request historical data
+    ep_model = ListModel()
+    p_ins = []
+    for ep in endpoints:
+        p_in, p_out = Pipe()
+        p_ins.append(p_in)
+        ep['pipe'].append(p_out)
+        ep_model.add(EndPoint(name=ep['name']))
+    # create process for various purpose
+    # init(c2p_queue, endpoints)
+    # create action for UI sending action to process through pipe
+    action = Action(pipes=p_ins)
+    # create datasource for UI
+    ds_model = ListModel()
+    i = 0
+    for ds in datasources:
+        ds_model.add(Datasource(name=ds['name']+' - '+ds['vendor'], status=i))
+        i += 1
+    # starting up UI
+    with enaml.imports():
+        from .ui.main import Main
+    app = QtApplication()
+    view = Main(datasources1=ds_model, endpoints1=ep_model, action=action)
+    view.show()
+    app.start()
+
 
 '''
-    # with open("d:/ib/t2/data/stocks.txt", 'r', encoding='UTF-8') as f:
-    #    b = ['HK.{0}'.format(re.split(r'\t+', x.strip(' \t\n\r'))[0]) for x in f if len(x.strip())>0]
-    # del b[0]
-
-    ft1 = FTController(id='ft1', host='127.0.0.1', port=11111)
-    # ft2 = FTController(id='ft2', host='127.0.0.1', port=11112)
-    ft1.connect()
-    ft1.open_trade('HK')
-    # ft2.connect()
-
-    limit = {"no_of_stocks": 15, "interval": 30}
-
-    # b = ['US.AAPL', 'US.QQQ']
-    #b = ['HK.00700','HK.02318']
-    # b = ['HK.00700','HK.02318','HK.03333','HK.00939','HK.00941','HK.01299','HK.00388','HK.00005','HK.00175']
-    # ft1.request_history_data(b[:70], limit, start='2018-09-19', end='2018-09-19')
-    # ft2.request_history_data(b[70:], limit, start='2018-09-19', end='2018-09-19')
-    # ft1.scan(b[0:9], '5m', limit, date='2018-09-26')
-    # ft2.scan(b[2:4], '1m', limit, date='2018-09-24')
-
-    order_list = [{'Code':'HK.00700', 'Qty':1, 'Price': '300', 'TradeSide': 'BUY', 'Market': 'HK'}]
-    ft1.place_order(json.dumps(order_list), limit)
-    '''
+    first layer: vendor ID
+    second layer: general and level
+    three layer: function name, if value is a tuple, then would be frequency within a period
+                if value is number, that would be request limitation 
+'''
+limitaion = {
+    'futu':
+    {
+        'general': 
+            {'subscribe_kline': 100,
+            'get_plate_list': (10,30),
+            'request_history_kline': (10,30),
+            'place_order': (15,30),
+            'unlock_trade': (10,30),
+            'modify_order': (20,30),
+            'change_order': (20,30),
+            'history_order_list_query': (10,30),
+            'history_deal_list_query': (10,30),
+            },
+        'level':
+            {'level1':
+                {'get_market_snapshot': {'freq': (30,30), 'no': 400}},
+            'level2':
+                {'get_market_snapshot': {'freq': (20,30), 'no': 300}},
+            'level3':
+                {'get_market_snapshot': {'freq': (10,30), 'no': 200}},
+            }
+    },
+    'ib':
+    {
+        'general':
+            {
+                'request_history': (60, 600),
+                'request_history_same_contract': (6, 2),
+            }
+    }    
+}
+datasources = [
+    {
+        'name': 'CaoXiao',
+        'vendor': 'futu',
+        'port': 11111,
+        'level': 2        
+    },
+    {
+        'name': 'WHCHAN',
+        'vendor': 'futu',
+        'port': 11112,
+        'level': 2        
+    },
+    {
+        'name': 'Winton',
+        'vendor': 'futu',
+        'port': 11113,
+        'level': 2        
+    },
+    {
+        'name': 'Winton',
+        'vendor': 'ib',
+        'port': {'TWS': {'PAPER': 7497, 'REAL': 7496},
+                'IBG': {'PAPER': 7497, 'REAL': 7496}},
+    },
+]

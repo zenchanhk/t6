@@ -5,22 +5,23 @@ import asyncio
 import concurrent
 import pandas as pd
 import numpy as np
+import threading
 from futuquant import *
 from ..datasource.ft.ft_controller import FTController
+from ..datasource.ib.IBConnector import IBConnector
+
 import os 
 dir_path = os.path.dirname(os.path.realpath(__file__))
 import signal
 import Ice
 Ice.loadSlice(os.path.join(dir_path, 'traderex.ice'))
 import TraderEx
-import pydevd
-from concurrent.futures import ProcessPoolExecutor
-
 
 class Messenger(TraderEx.Server):
 
-    def __init__(self, server_name):
+    def __init__(self, server_name, ui_queue, data_queue, shared_dict):
         self._serv_name = server_name
+        self._queue = queue
         self._receiver = {}
         self._ds = {}
         self._clientid = 0
@@ -55,10 +56,16 @@ class Messenger(TraderEx.Server):
         if receiver in self._receiver:
             self._receiver[receiver].onStatus(status)
 
-    def add_data_source(self, controller, host, port):
+    def add_data_source(self, controller, host, port, lmt):
+        '''
+            controller: a class name - FTController
+            host:
+            port:
+            lmt: limitations of request_kline_history and place_order
+        '''
         ctrl = controller.__name__ + host + port
         if ctrl not in self._ds:
-            self._ds[ctrl] = controller(host=host, port=port)
+            self._ds[ctrl] = controller(host=host, port=port, lmt=lmt, queue=self._queue)
         return ctrl
 
 
@@ -123,34 +130,4 @@ class Executor:
             return msg
 
 
-# =========================================================
-#
-# The Ice communicator is initialized with Ice.initialize
-# The communicator is destroyed once it goes out of scope of the with statement
-#
-def create_endpoint(name):
-    print('PID:{0}, Thread:{1}'.format(os.getpid(), threading.currentThread().getName()))
-    with Ice.initialize(os.path.join(dir_path, "config.server")) as communicator:
 
-        #
-        # Install a signal handler to shutdown the communicator on Ctrl-C
-        #
-        signal.signal(signal.SIGINT, lambda signum, frame: communicator.shutdown())
-
-        #
-        # The communicator initialization removes all Ice-related arguments from argv
-        #
-        if len(sys.argv) > 1:
-            print(sys.argv[0] + ": too many arguments")
-            sys.exit(1)
-
-        adapter = communicator.createObjectAdapter(name + "Adapter")
-        adapter.add(Messenger(name), Ice.stringToIdentity(name))
-        adapter.activate()
-        communicator.waitForShutdown()
-
-def init():
-    with ProcessPoolExecutor(max_workers=5) as executor:
-        executor.submit(create_endpoint, 'DataCenter')
-        executor.submit(create_endpoint, 'OrderPlace')
-        executor.submit(create_endpoint, 'LimitedReq')

@@ -105,23 +105,29 @@ class Fifo:
 
 class FTController:
     
-    def __init__(self, id, messenger, req_lmt, order_lmt, host='127.0.0.1', port=11111):
+    def __init__(self, name, messenger, lmt, queue, host='127.0.0.1', port=11111):
         
-        self._req_his = Fifo(req_lmt.period, req_lmt.quote)
-        self._order_his = Fifo(order_lmt.period, order_lmt.quote)
+        if 'req_kline' in lmt:
+            self._req_his = Fifo(lmt['req_kline'].period, lmt['req_kline'].quote)
+        if 'order' in lmt:    
+            self._order_his = Fifo(lmt['order'].period, lmt['order'].quote)
 
         self._connector = None
         self._messenger = messenger
+        
         self._hktrade = None
         self._ustrade = None
         self._cntrade = None
         self._hkcctrade = None
-        self._kline_handler = None
-        self._trade_handler = None
+        self._sysinfo_handler = SysNotifyHandlerBase(self)
+        self._kline_handler = CurKlineHandler(self)
+        self._trade_handler = TradeOrderHandler(self)
         self._sub_list = {}
+        
         self._status = None
+        self._queue = queue
+        self._name = name
 
-        self._id = id
         self._host = host
         self._port = port
         
@@ -141,12 +147,11 @@ class FTController:
     def _connect(self): 
         # print('connecting...')
         if self._connector is None:
-            self._connector = FTConnector(id=self._id, host=self._host, port=self._port)
-        if self._kline_handler is None:
-            self._kline_handler = CurKlineHandler(self)
-        self._connector.set_handler(self._kline_handler)
-        self._connector.connectEvent += self._messenger.on_status
-        self._connector.errorEvent += self._messenger.on_error
+            self._connector = FTConnector(id=self._name, host=self._host, port=self._port)
+            self._connector.set_handler(self._kline_handler)
+            self._connector.set_handler(self._sysinfo_handler)
+            self._connector.connectEvent += self._messenger.on_status
+            self._connector.errorEvent += self._messenger.on_error
         return '{"ret_val": 0}'
 
     def disconnect(self):
@@ -165,11 +170,10 @@ class FTController:
         trade = getattr(self, TradePlatMap[market]['var'])
         if trade is None:
             setattr(self, TradePlatMap[market]['var'], 
-                TradePlatMap[market]['class'](id=self._id, host=self._host, port=self._port))
-        if self._trade_handler is None:
-            self._trade_handler = TradeOrderHandler(self)
-        trade = getattr(self, TradePlatMap[market]['var'])
-        trade.set_handler(self._trade_handler)
+                TradePlatMap[market]['class'](name=self._name, host=self._host, port=self._port))
+            trade = getattr(self, TradePlatMap[market]['var'])
+            trade.set_handler(self._trade_handler)
+            trade.set_handler(self._sysinfo_handler)
         # self._hktrade.connectEvent += self._messenger.on_status
         # self._hktrade.errorEvent += self._messenger.on_error
         return '{"ret_val": 0}'
@@ -262,13 +266,13 @@ class FTController:
 
         for i in range(0, len(code_list), no_of_stocks):
             # calculate the time passed since last call
-            # print('{0} last req_time: {1}'.format(self._id, self._req_time['request_history_kline'].strftime('%H:%M:%S')))
+            # print('{0} last req_time: {1}'.format(self._name, self._req_time['request_history_kline'].strftime('%H:%M:%S')))
             time_passed = (datetime.now() - self._req_time['request_history_kline']).total_seconds()
             print('{0} time passed. Now: {1}'.format(time_passed, datetime.now().strftime('%H:%M:%S')))
             if time_passed > 0:
                 await asyncio.sleep(interval - time_passed + 5)
             self._req_time['request_history_kline'] = datetime.now()
-            print('{0} retrieving: {1}'.format(self._id, datetime.now().strftime('%H:%M:%S')))
+            print('{0} retrieving: {1}'.format(self._name, datetime.now().strftime('%H:%M:%S')))
             for j in range(no_of_stocks):
                 if i+j >= len(code_list):
                     break
@@ -400,10 +404,25 @@ class FTController:
         return ret, err
 
 def set_strategy(code_list, strategy):
-    
+    pass
 
 def apply_strategy(p_input):
     pass
+
+class SysNotifyTest(SysNotifyHandlerBase):
+    def __init__(self, controller):
+        self._controller = controller
+        self._dataEvent = Event()
+        self._dataEvent += self._controller._messenger.on_data
+
+    def on_recv_rsp(self, rsp_str):
+        ret_code, data = super(SysNotifyTest, self).on_recv_rsp(rsp_pb)
+        notify_type, sub_type, msg = data
+        if ret_code != RET_OK:
+            logger.debug("SysNotifyTest: error, msg: %s" % msg)
+            return RET_ERROR, data
+        print(msg)
+        return RET_OK, data
 
 class TradeOrderHandler(TradeOrderHandlerBase):
   """ order update push"""
@@ -439,98 +458,34 @@ class CurKlineHandler(CurKlineHandlerBase):
         self._dataEvent.notify_all({"req_type":"kline", "ret_val":
                                     json.dumps(data.to_dict(orient='list'), default=lambda o: o.__dict__)})
         # get the shape of result df
-        r, c = data.shape
+        
 
-        for row in range(r):
-            # initialization
-            tmp = {}        # save row to compare
-            bc = False      # close break for the bar closed
-            bv = False      # volume break for the bar closed
-            bc_rt = False   # close break for real-time data
-            bv_rt = False   # volume break for real-time data
-            new_bar = False
-            # get row
-            tmp = data.iloc[row:row+1].copy()   # copy the slice
-            # debug printing
-            print(tmp.values.tolist())
-            # check the date first, drop it if not today
-            # take the time-zone into consideration
-            # if US, subtract 12 hours
-            now = datetime.now()
-            if tmp.iloc[-1]['code'][:2] == 'US':
-                now -= timedelta(hours=12)
-            now = now.strftime('%Y-%m-%d')
-            if tmp.iloc[-1]['time_key'][:10] != now:
-                # debug printing
-                print('row dropped: {0}'.format(tmp.values.tolist()))
-                break
-            # if first seen
-            t1 = tmp.iloc[-1]   # shortcut
-            if t1['code'] not in _sdf:
-                _sdf[t1['code']] = tmp.assign(**_indicator)
-                # must reset index here; otherwise, adding new bar will not work
-                _sdf[t1['code']].reset_index(drop=True, inplace=True)
-            else:
-                if _sdf[t1['code']].iloc[-1]['time_key'] != t1['time_key']:
-                    if datetime.strptime(_sdf[t1['code']].iloc[-1]['time_key'], '%Y-%m-%d %H:%M:%S') < \
-                            datetime.strptime(t1['time_key'], '%Y-%m-%d %H:%M:%S'):
-                        # if new bar, add it to the dataframe and update the calculated columns
-                        # update the last row of df first (calculated columns), and then insert new row
-                        update_df(_sdf[t1['code']])
-                        # new row index
-                        upd_index = len(_sdf[t1['code']].index)
-                        new_bar = True
-                    else:
-                        # drop bars with past time_key found
-                        break
-                else:
-                    # replace the whole row
-                    upd_index = len(_sdf[t1['code']].index) - 1
-                # insert new row or update the row
-                _sdf[t1['code']].loc[upd_index] = tmp.assign(**_indicator).values.tolist()[0]
+        # print(_sdf)
+        # if the number of bars exceeds 4, start comparing at bar no. 5
+        df = _sdf[t1['code']]     # shortcut
+        if len(df.index) > 4:                
+            df = _sdf[t1['code']]
+            bc_rt = t1['close'] > df.iloc[-2]['max_c4']
+            bv_rt = t1['volume'] > df.iloc[-2]['max_v4']
+        # if both break
+        if bc_rt and bv_rt:
+            code = t1['code']
+            result = {'code': code, 'time': t1['time_key'], 'fulfilled': [],
+                        'close': numpyGenericToNative(t1['close']), 
+                        'volume': numpyGenericToNative(t1['volume']), 
+                        'time_found': datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 
-                # debug printing
-                if new_bar:
-                    # print(_sdf[t1['code']])
-                    df = _sdf[t1['code']].iloc[-2]     # shortcut
-                    if len(_sdf[t1['code']]) >= 5:
-                        print('code:{0}, close:{1}, volume：{2}, time:{3}, last_close_max:{4}, last_vol_max:{5}, maxc4:{6},'
-                                'maxv4:{7}, maxc5:{8}, maxv5:{9}, maxc:{10}, maxv:{11}'.format(t1['code'],
-                                t1['close'], t1['volume'], t1['time_key'], 
-                                _max_c_last[t1['code']] if t1['code'] in _max_c_last else 0,
-                                _max_v_last[t1['code']] if t1['code'] in _max_v_last else 0, df['max_c4'], df['max_v4'],
-                                df['max_c5'], df['max_v5'],
-                                _max_c[t1['code']], _max_v[t1['code']]))
-                    else:
-                        print('code:{0}, close:{1}, volume：{2}, time:{3}, maxc:{4}, maxv:{5}'.format(t1['code'],
-                            t1['close'], t1['volume'], t1['time_key'], _max_c[t1['code']], _max_v[t1['code']]))
+            # if break yesterday's highest
+            if code in _max_c_last and code in _max_v_last and \
+                    t1['close'] > _max_c_last[code] and t1['volume'] > _max_v_last[code]:
+                result['fulfilled'].append('break last day highest')
+            # if break today's highest
+            if code in _max_c and code in _max_v and \
+                    t1['close'] > _max_c[code] and t1['volume'] > _max_v[code]:
+                result['fulfilled'].append('break today highest')
 
-            # print(_sdf)
-            # if the number of bars exceeds 4, start comparing at bar no. 5
-            df = _sdf[t1['code']]     # shortcut
-            if len(df.index) > 4:                
-                df = _sdf[t1['code']]
-                bc_rt = t1['close'] > df.iloc[-2]['max_c4']
-                bv_rt = t1['volume'] > df.iloc[-2]['max_v4']
-            # if both break
-            if bc_rt and bv_rt:
-                code = t1['code']
-                result = {'code': code, 'time': t1['time_key'], 'fulfilled': [],
-                            'close': numpyGenericToNative(t1['close']), 
-                            'volume': numpyGenericToNative(t1['volume']), 
-                            'time_found': datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-
-                # if break yesterday's highest
-                if code in _max_c_last and code in _max_v_last and \
-                        t1['close'] > _max_c_last[code] and t1['volume'] > _max_v_last[code]:
-                    result['fulfilled'].append('break last day highest')
-                # if break today's highest
-                if code in _max_c and code in _max_v and \
-                        t1['close'] > _max_c[code] and t1['volume'] > _max_v[code]:
-                    result['fulfilled'].append('break today highest')
-
-                print(result)
-                self._dataEvent.notify_all({"action":"scan", "ret_val": json.dumps(result)})
+            print(result)
+            self._dataEvent.notify_all({"action":"scan", "ret_val": json.dumps(result)})
 
         return RET_OK, data
  

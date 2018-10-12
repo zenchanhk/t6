@@ -1,25 +1,35 @@
-from enaml.widgets.api import Window, Field, Container, ObjectCombo, Label, PushButton
-from enaml.layout.api import vbox, hbox, spacer, align
+from enaml.widgets.api import (MainWindow, Window, Dialog, Field, Container, ObjectCombo, Label, PushButton, 
+    MenuBar, Menu, Action, StatusBar, StatusItem, DockArea, DockItem, CheckBox, Html)
+from enaml.layout.api import (vbox, hbox, spacer, align, HSplitLayout, VSplitLayout, TabLayout, InsertItem)
+from enaml.stdlib.message_box import question
+from enaml.core.looper import Looper
 from enaml.icon import Icon, IconImage
 from enaml.image import Image
 import qtawesome as qta
 from enaml.styling import (
     StyleSheet, Style, Setter
 )
+from enamlx.widgets.table_view import (
+    TableView, TableViewRow, TableViewItem
+)
+from atom.api import (Atom, Unicode, Range, ContainerList, Bool)
+from enaml.core.api import Include
+
 import os
 
 from .widgets.symbol_search import SymbolSearch
 #from .widgets.symbol_search import TableView
-from .widgets.mybutton import MyButton
 from .widgets.tableview import TableView
 from .widgets.data_frame_table import DataFrameTable
 
 from .widgets.list import QtListStrWidget
 import qtawesome as qta
-from PyQt5.QtSvg import QSvgRenderer
 from PyQt5.QtGui import QIcon, QImage
-from PyQt5.QtCore import QByteArray, QBuffer
+from ..main import Status
 
+enamldef SampleAction(Action):
+    text = 'Quit'
+    triggered :: print(text)
 
 def image(name):    
     dirname = os.path.dirname(__file__)
@@ -34,112 +44,113 @@ def image_path(name):
     return os.path.join(dirname, 'images', name)
 
 enamldef AppSheet(StyleSheet):
-    Style:
-        element = 'Field, ObjectCombo, Label, SymbolSearch'
-        Setter:
-            field = 'font-size'
-            value = '20px'
-        Setter:
-            field = 'padding'
-            value = '2px'
-        Setter:
-            field = 'border-style'
-            value = 'solid'
-        Setter:
-            field = 'border-width'
-            value = '2px'
-        Setter:
-            field = 'border-color'
-            value = 'transparent'
-    Style:
-        element = 'Field, ObjectCombo'
-        Setter:
-            field = 'border-radius'
-            value = '5px'
-        Setter:
-            field = 'background-color'
-            value = 'lineargradient(red, yellow)'
-    Style:      
-        element = 'Field, ObjectCombo'
-        pseudo_class = 'focus'
-        Setter:
-            field = 'border-color'
-            value = '#4286f4'
-    Style:
-        element = 'ObjectCombo'
-        pseudo_element = 'down-button'
-        Setter:
-            field = 'color'
-            value = 'red'
-        
-    Style:      
-        element = 'ObjectCombo'
-        pseudo_element = 'down-button'
-        Setter:
-            field = 'background'
-            value = 'lightblue'
-        
-enamldef Main(Window):
-    attr ssdata
-    attr model
-    attr dfModel
-    title = 'IB Trader'
-    
-    #icon = Icon(images = [IconImage(image=Image(data=open(image_path('stock.ico'), 'rb').read()))])
-    #icon = Icon(images=[IconImage(image=Image(data=image('stock.ico')))])
-    #icon = Icon(images = [IconImage(image=Image(data=icon('fa.flag')))])
-    icon = Icon(_tkdata=qta.icon('fa.flag'))
-    #icon = Icon(_tkdata=QSvgRenderer(image_path('connect.svg')))
-    Container:
+    pass
 
+enamldef MyMenuBar(MenuBar): 
+    attr mw
+    attr about_window = AboutDialog()
+    Menu:
+        title = '&File'
+        Action:
+            text = 'Quit\tCtrl+Z'
+            triggered :: mw.close()
+    Menu:
+        title = '&Help'
+        Action:
+            text = 'About'
+            triggered :: about_window.show()
+
+enamldef MyStatusBar(StatusBar):
+    StatusItem:
+        Label:
+            text = "Ready"
+
+enamldef AboutDialog(Dialog):
+    attr s = self
+    title = 'About'    
+    icon = Icon(_tkdata=qta.icon('mdi.owl', options=[{'color': '#5cf442'}]))
+    Container:
         constraints = [
-            vbox(
-                hbox(ss, mb, spacer),
-                hbox(lst, spacer),
-                hbox(label, combo_align, spacer),
-                hbox(field, spacer),
-                hbox(pb1, spacer),
-                hbox(tb),
-                #hbox(dft)
+            vbox(                
+                hbox(icon, html), 
+                pb
             ),
-            align('v_center', label, combo_align),
-            field.width == 300,
+            align('v_center', icon, html),
+            html.width == 400,
+        ]
+        Label: icon:
+            text = 'icon'
+        Html: html:
+            source = '<h1><center>Datasource manager for stock analysis</center></h1>'
+        PushButton: pb:
+            text = 'OK'
+            clicked :: s.hide()
+
+def confirm_close(window, event):
+    button = question(
+        window, 'Appliction closing', 'Are you sure to exit?\nWarning: All connections will be lost.'
+    )
+    if button and button.action == 'accept':
+        event.accept()
+    else:
+        event.ignore()
+
+
+enamldef MainDockArea(DockArea):
+    attr datasources
+    attr endpoints
+    layout = VSplitLayout(
+        TabLayout('n1','n2'),
+        TabLayout('n3','n4')
+    )
+
+    DockItem:
+        name = 'n1'
+        title = 'N1'
+    DockItem:
+        name = 'n2'
+        title = 'N2'
+    DockItem:
+        name = 'n3'
+        title = 'N3'
+    DockItem:
+        name = 'n4'
+        title = 'N4'
+    
+    #Include:
+    #    objects << [DockItem(title=i.name) for i in endpoints.lst] 
+
+enamldef Main(MainWindow):
+    attr datasources1
+    attr endpoints1
+    attr action
+    attr s = self
+    title = 'Datasource Manager'    
+    icon = Icon(_tkdata=qta.icon('mdi.owl', options=[{'color': '#5cf442'}]))
+    closing :: confirm_close(self, change['value'])
+    initialized :: 
+        print('hw')
+        for i in self.endpoints1.lst:
+            name = i.name
+            title = i.name
+            item = DockItem(ep_area, name=i.name, title=i.name)
+            op = InsertItem(item=name, target='n2', position='right')
+            ep_area.update_layout(op)
+    attr s = self
+    MyMenuBar:
+        mw = s
+    MyStatusBar:
+        pass
+               
+    Container:
+        constraints = [
+            vbox(                
+                ep_area
+            ),
+            #align('v_center', label, combo_align)
         ]
 
-        TableView: tb:
-            tableModel = model
+        MainDockArea: ep_area:
+            endpoints << endpoints1
 
-        DataFrameTable: dft:
-            data_frame = dfModel
-
-        MyButton: mb:
-            text = ssdata.text
-
-        QtListStrWidget: lst:
-            pass
-
-        SymbolSearch: ss:
-            data := ssdata.data
-            enterPressed :: 
-                v = change['value']
-                #print(v)
-                #ssdata.search(v)
-                #action.search(v)
-            setting := ssdata.setting
-            placeholder := ssdata.text
-        
-        Label: label:
-            text = 'text_align:'
-
-        ObjectCombo: combo_align:
-            items = ['Buy', 'Sell']
-            selected = 'Buy'
-
-        Field: field:
-            placeholder = 'Enter code...'
-            text << str(ssdata.test)
-        
-        PushButton: pb1:
-            text = 'Push Me'
-            clicked :: ssdata.click()
-            
+                

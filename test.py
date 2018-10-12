@@ -1,63 +1,92 @@
-import os
-import time
-import asyncio
-import aioprocessing
-import multiprocessing
+from multiprocessing import Process, Queue, Pipe
+from threading import Thread
+import sys
+from PyQt5 import QtGui, QtCore
+from PyQt5 import QtWidgets
 
-t = {}
+class Emitter(QtCore.QObject, Thread):
+    msg = QtCore.pyqtSignal(object)
+    def __init__(self, transport, parent=None):
+        QtCore.QObject.__init__(self, parent)
+        Thread.__init__(self)
+        self.transport = transport
 
-def func(queue, event, lock, items, t):
-    """ Demo worker function.
+    def _emit(self, signature, args=None):
+        if args:
+            self.msg.emit(args)
+        else:
+            self.msg.emit()
 
-    This worker function runs in its own process, and uses
-    normal blocking calls to aioprocessing objects, exactly 
-    the way you would use oridinary multiprocessing objects.
+    def run(self):
+        while True:
+            try:
+                # signature = self.transport.recv()
+                signature = self.transport.get()
+                print(signature)
+            except EOFError:
+                break
+            else:
+                self._emit(*signature)
 
-    """
-    print('processing pid:{0}'.format(os.getpid()))
-    #with lock:
-        #event.set()
-    for item in items:
-        for i in range(10000):
-            t.update({i: i+1})
-            if i % 1000 ==0:
-                print('processing pid:{0}'.format(os.getpid()))
-                print('length:{0}'.format(len(t)))
-    queue.close()
+class Form(QtWidgets.QDialog):
 
-@asyncio.coroutine
-def example(queue, event, lock):
-    l = [1,2,3,4,5]
-    p = aioprocessing.AioProcess(target=func, args=(queue, event, lock, l, t))
-    p2 = aioprocessing.AioProcess(target=func, args=(queue, event, lock, l, t))
-    p.start()
-    p2.start()
-    while True:
-        result = yield from queue.coro_get()
-        if result is None:
-            break
-        print("Got result {0}: pid: {1}".format(result, os.getpid()))
-    yield from p.coro_join()
-    yield from p2.coro_join()
+    def __init__(self, queue, emitter, parent=None):
+        super().__init__(parent)
+        self.data_to_child = queue
+        self.emitter = emitter
+        self.emitter.daemon = True
+        self.emitter.start()
+        self.browser = QtWidgets.QTextBrowser()
+        self.lineedit = QtWidgets.QLineEdit('Type text and press <Enter>')
+        self.lineedit.selectAll()
+        layout = QtWidgets.QVBoxLayout()
+        layout.addWidget(self.browser)
+        layout.addWidget(self.lineedit)
+        self.setLayout(layout)
+        self.lineedit.setFocus()
+        self.setWindowTitle('Upper')
+        self.lineedit.returnPressed.connect(self.to_child)
+        #self.connect(self.emitter, QtCore.SIGNAL('data(PyObject)'), self.updateUI)
+        self.emitter.msg.connect(self.updateUI)
 
-@asyncio.coroutine
-def example2(queue, event, lock):
-    yield from event.coro_wait()
-    #with (yield from lock):
-    yield from queue.coro_put(78)
-    yield from queue.coro_put(None) # Shut down the worker
+    def to_child(self):
+        self.data_to_child.put(self.lineedit.text())
+        self.lineedit.clear()
 
-if __name__ == "__main__":
-    print(t)
-    print('current pid: {0}'.format(os.getpid()))
-    loop = asyncio.get_event_loop()
-    queue = aioprocessing.AioQueue()
-    lock = aioprocessing.AioLock()
-    event = aioprocessing.AioEvent()
-    tasks = [
-        asyncio.ensure_future(example(queue, event, lock)), 
-        asyncio.ensure_future(example2(queue, event, lock)),
-    ]
-    f = loop.run_until_complete(asyncio.wait(tasks))
-    
-    loop.close()
+    def updateUI(self, text):
+        self.browser.append(text[0])
+
+class ChildProc(Process):
+
+    def __init__(self, transport, queue, daemon=True):
+        Process.__init__(self)
+        self.daemon = daemon
+        self.transport = transport
+        self.data_from_mother = queue
+
+    def emit_to_mother(self, signature, args=None):
+        signature = (signature, )
+        if args:
+            signature += (args, )
+        # self.transport.send(signature)
+        self.transport.put(signature)
+
+    def run(self):
+        while True:
+            text = self.data_from_mother.get()
+            self.emit_to_mother('data(PyQt_PyObject)', (text.upper(),))
+
+if __name__ == '__main__':
+
+    app = QtWidgets.QApplication(sys.argv)
+    mother_pipe, child_pipe = Pipe()
+    q2 = Queue()
+    queue = Queue()
+    # emitter = Emitter(mother_pipe)
+    emitter = Emitter(queue)
+    form = Form(queue, emitter)
+    # ChildProc(child_pipe, queue).start()
+    ChildProc(queue, queue).start()
+    form.show()
+    app.exec_()
+    sys.exit(0)
